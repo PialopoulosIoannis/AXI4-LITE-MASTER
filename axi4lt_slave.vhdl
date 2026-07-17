@@ -10,8 +10,8 @@ entity axi4_lite_master is
         NB_COL : integer := 4
     );
     port (
-        aclk            : out   STD_LOGIC; 
-        areset_n        : out   STD_LOGIC;
+        aclk            : in   STD_LOGIC; 
+        areset_n        : in   STD_LOGIC;
         
         s_axilt_awaddr  : out   STD_LOGIC_VECTOR(ADDR_WIDTH-1 downto 0);
         s_axilt_awvalid : out   STD_LOGIC;
@@ -37,10 +37,10 @@ entity axi4_lite_master is
     );
 end axi4_lite_master;
 
-architecure behavioural of axi4_lite_master is
+architecture behavioural of axi4_lite_master is
     signal src_base_addr : std_logic_vector(ADDR_WIDTH-1 downto 0) <= "00000000";
-    signal length_in_bytes : std_logic_vector((NB_COL * COL_WIDTH)-1 downto 0) <= 0b"00000000000000000000000000000001";
-    signal mydata : std_logic_vector((NB_COL * COL_WIDTH)-1 downto 0);
+    signal length_in_bits : std_logic_vector((NB_COL * COL_WIDTH)-1 downto 0) <= b"00000000000000000000000000000001";
+    signal mydata : std_logic_vector((NB_COL * COL_WIDTH)-1 downto 0) <= (others => '0'); 
     signal internal_arvalid : std_logic;
     signal internal_rready : std_logic;
 
@@ -48,27 +48,27 @@ architecure behavioural of axi4_lite_master is
     process(areset_n,aclk) --READ
     begin
         if areset_n = '0' then 
-            s_axilt_arvalid = '0';
-            s_axilt_awvalid = '0';
-            s_axilt_wvalid = '0';
+           internal_arvalid <= '0';
+            s_axilt_awvalid <= '0';
+            s_axilt_wvalid <= '0';
         elsif rising_edge(aclk) then
-            if src_base_addr != "11111111" then
-                internal_arvalid = '1';
-                s_axilt_rready = '1';
+            if src_base_addr /= "11111111" then
+                internal_arvalid <= '1';
+                s_axilt_rready =<='1';
             end if;
             if internal_arvalid = '1' and s_axilt_arready = '1' then
-                internal_arvalid = '0';
-                src_base_addr = "11111111";
+                internal_arvalid <= '0';
+                src_base_addr <="11111111";
             end if;
             if s_axilt_rvalid = '1' and internal_rready = '1' then 
-                internal_rready = '0';
-                mydata(length_in_bytes downto 0) <= s_axilt_rdata;
+                internal_rready <= '0';
+                mydata <= s_axilt_rdata(length_in_bytes downto 0);
                 report "DATA: " & to_string(mydata);
             end if;
         end if;
     end process;
-internal_arvalid <= s_axilt_arvalid;
-internal_rready <= s_axilt_rready;
+s_axilt_arvalid <= internal_arvalid ;
+s_axilt_rready <= internal_rready ;
 
 end behavioural;
 
