@@ -62,12 +62,15 @@ architecure behavioural of axi4_lite_master is
             end if;
             if s_axilt_rvalid = '1' and internal_rready = '1' then 
                 internal_rready = '0';
-                mydata <= s_axilt_rdata;
+                mydata(length_in_bytes downto 0) <= s_axilt_rdata;
+                report "DATA: " & to_string(mydata);
             end if;
         end if;
     end process;
 internal_arvalid <= s_axilt_arvalid;
 internal_rready <= s_axilt_rready;
+
+end behavioural;
 
 
 
