@@ -37,6 +37,8 @@ entity axi4_lite_master is
     );
 end axi4_lite_master;
 
+
+
 architecture behavioural of axi4_lite_master is
     signal src_base_addr : std_logic_vector(ADDR_WIDTH-1 downto 0) := "00000000";
     signal length_in_bytes : std_logic_vector((NB_COL * COL_WIDTH)-1 downto 0) := b"00000000000000000000000000000001";
@@ -47,6 +49,18 @@ architecture behavioural of axi4_lite_master is
     type ram_type is array (0 to SIZE - 1) of std_logic_vector(NB_COL * COL_WIDTH - 1 downto 0);
     signal mydata : ram_type := (others => (others => '0'));
     signal internal_araddr : std_logic_vector(ADDR_WIDTH-1 downto 0) := (others => '0');
+
+    function to_hex(slv : std_logic_vector) return string is
+    constant hex_chars : string(1 to 16) := "0123456789ABCDEF";
+    variable hex    : string(1 to slv'length/4);
+    variable nibble : std_logic_vector(3 downto 0);
+begin
+    for i in hex'range loop
+        nibble := slv(slv'high - (i-1)*4 downto slv'high - (i-1)*4 - 3);
+        hex(i) := hex_chars(to_integer(unsigned(nibble)) + 1);
+    end loop;
+    return hex;
+end function;
 
 begin 
     process(areset_n,aclk) --READ
@@ -119,12 +133,16 @@ begin
             when FINAL =>
                     report "DATA READ ARE:";
                     for i in 0 to counter-1 loop 
-                        report "DATA:" &to_string(mydata(i));
+                        report "DATA:" & to_hex(mydata(i));
                     end loop; 
                     state <= DONE;
+           
+            when DONE =>
+            null;
             end case; 
-            end if;
+             end if;
             end process;
+
 s_axilt_arvalid <= internal_arvalid ;
 s_axilt_rready <= internal_rready ;
 s_axilt_araddr <= internal_araddr;
