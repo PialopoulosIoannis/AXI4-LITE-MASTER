@@ -62,7 +62,7 @@ architecture behavioural of axi4_lite_master is
             end if;
             if s_axilt_rvalid = '1' and internal_rready = '1' then 
                 internal_rready <= '0';
-                mydata <= s_axilt_rdata(length_in_bytes downto 0);
+                mydata <= s_axilt_rdata(length_in_bytes-1 downto 0);
                 report "DATA: " & to_string(mydata);
             end if;
         end if;
