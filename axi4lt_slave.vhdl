@@ -42,19 +42,22 @@ architecture behavioural of axi4_lite_master is
     signal length_in_bytes : std_logic_vector((NB_COL * COL_WIDTH)-1 downto 0) := b"00000000000000000000000000000001";
     signal internal_arvalid : std_logic;
     signal internal_rready : std_logic;
-    type STATES is (IDLE,READ,FINAL_READ,END);
+    type STATES is (IDLE,READ,FINAL_READING,FINAL,DONE);
     signal state : STATES:= IDLE;
     type ram_type is array (0 to SIZE - 1) of std_logic_vector(NB_COL * COL_WIDTH - 1 downto 0);
     signal mydata : ram_type := (others => (others => '0'));
+    signal internal_araddr : std_logic_vector(ADDR_WIDTH-1 downto 0) := (others => '0');
 
-
+begin 
     process(areset_n,aclk) --READ
-    begin
+    
     variable counter : integer := 0;
     variable how_many_reads : integer;
     variable final_read : integer;
     variable bytes_in_int : integer;
-
+    variable mask : std_logic_vector(NB_COL * COL_WIDTH - 1 downto 0) := (others => '0');
+    
+    begin
         if areset_n = '0' then 
            internal_arvalid <= '0';
             s_axilt_awvalid <= '0';
@@ -63,12 +66,22 @@ architecture behavioural of axi4_lite_master is
           case (state) is
            when IDLE =>   
                 bytes_in_int:= to_integer(unsigned(length_in_bytes));
-                how_many_reads:= bytes_in_int div 4;
+                how_many_reads:= bytes_in_int / 4;
                 final_read:= bytes_in_int mod 4; 
-                s_axilt_araddr <= src_base_addr;
-                state <= READ;
+                internal_araddr <= src_base_addr;
+                for i in 0 to (NB_COL * COL_WIDTH) - 1 loop
+                        if i< final_read*8 then
+                            mask(i) := '1';
+                        else
+                            mask(i) := '0';
+                        end if;
+                end loop;
+                if how_many_reads /= 0 then
+                    state <= READ;
+                else state <= FINAL_READING;
+                end if;
            when READ =>
-                if s_axilt_araddr /= "11111111" then
+                if internal_araddr /= "11111111" then
                 internal_arvalid <= '1';
                 internal_rready <= '1';
             end if;
@@ -81,38 +94,40 @@ architecture behavioural of axi4_lite_master is
                 counter := counter + 1;
                 if counter /= how_many_reads then
                     state <= READ;
-                    s_axilt_araddr <= std_logic_vector(unsigned(src_base_addr) + to_unsigned(counter * 4, ADDR_WIDTH));
-                elsif final_read = '0' then
-                    state <= END;
+                    internal_araddr <= std_logic_vector(unsigned(src_base_addr) + to_unsigned(counter * 4, ADDR_WIDTH));
+                elsif final_read = 0 then
+                    state <= FINAL;
                 else 
-                state <= FINAL_READ;
-                 s_axilt_araddr <= std_logic_vector(unsigned(src_base_addr) + to_unsigned(counter * 4, ADDR_WIDTH));
+                state <= FINAL_READING;
+                 internal_araddr <= std_logic_vector(unsigned(src_base_addr) + to_unsigned(counter * 4, ADDR_WIDTH));
             end if;
-            when FINAL_READ => 
-                if s_axilt_araddr /= "11111111" then
+            end if;
+            when FINAL_READING => 
+                if internal_araddr /= "111111111111" then
                 internal_arvalid <= '1';
-                s_axilt_rready <= '1';
+                internal_rready <= '1';
                 end if;
                 if internal_arvalid = '1' and s_axilt_arready = '1' then
                     internal_arvalid <= '0';
                 end if; 
                 if s_axilt_rvalid = '1' and internal_rready = '1' then 
                     internal_rready <= '0';
-                    mydata(counter) <= s_axilt_rdata((final_read*8)-1 downto 0);
+                    mydata(counter) <= mask and s_axilt_rdata;
                     counter := counter + 1;
-                    state <= END;
+                    state <= FINAL;
                 end if;
-            when END =>
-                    report "DATA READ ARE:"
+            when FINAL =>
+                    report "DATA READ ARE:";
                     for i in 0 to counter-1 loop 
                         report "DATA:" &to_string(mydata(i));
                     end loop; 
-                    wait;
+                    state <= DONE;
             end case; 
             end if;
             end process;
 s_axilt_arvalid <= internal_arvalid ;
 s_axilt_rready <= internal_rready ;
+s_axilt_araddr <= internal_araddr;
 
 end behavioural;
 
