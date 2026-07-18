@@ -36,3 +36,8 @@ entity axi4_lite_master is
         s_axilt_rready  : out   STD_LOGIC
     );
 end axi4_lite_master;
+
+architecture behavioural of axi4_lite_master is
+    signal dst_base_addr : std_logic_vector (ADDR_WIDTH-1 downto 0);
+    signal bytes_lenght : std_logic_vector ((NB_COL * COL_WIDTH)-1 downto 0) : x"00000009";
+    signal mydata
