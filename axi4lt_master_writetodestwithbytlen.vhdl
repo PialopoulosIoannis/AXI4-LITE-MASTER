@@ -76,7 +76,22 @@ architecture behavioural of axi4_lite_master is
                     state <= WRITE;
                 else state <= FINAL_WRITING;
                 end if;
-            when WRITE =>     
+            when WRITE =>
+
+
+
+
+
+
+
+
+
+
+
+    end process;
+    s_axilt_awaddr <= internal_awaddr;
+
+end behavioural;
 
 
 
