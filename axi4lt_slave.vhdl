@@ -40,7 +40,7 @@ end axi4_lite_master;
 
 
 architecture behavioural of axi4_lite_master is
-    signal src_base_addr : std_logic_vector(ADDR_WIDTH-1 downto 0) := "000000000000";
+    signal src_base_addr : std_logic_vector(ADDR_WIDTH-1 downto 0) := b"000000000000";
     signal length_in_bytes : std_logic_vector((NB_COL * COL_WIDTH)-1 downto 0) := x"00000009";
     signal internal_arvalid : std_logic;
     signal internal_rready : std_logic;
@@ -50,7 +50,7 @@ architecture behavioural of axi4_lite_master is
     signal mydata : ram_type := (others => (others => '0'));
     signal internal_araddr : std_logic_vector(ADDR_WIDTH-1 downto 0) := (others => '0');
 
-     function to_hex(slv : std_logic_vector) return string is --hex function
+     function to_hex(slv : std_logic_vector) return string is --helper hex function by claude to make bi->hex//easier to read
         variable hex    : string(1 to slv'length/4);
         variable nibble : std_logic_vector(3 downto 0);
     begin
