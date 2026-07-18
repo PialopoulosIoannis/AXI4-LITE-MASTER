@@ -40,8 +40,8 @@ end axi4_lite_master;
 
 
 architecture behavioural of axi4_lite_master is
-    signal src_base_addr : std_logic_vector(ADDR_WIDTH-1 downto 0) := "00000000";
-    signal length_in_bytes : std_logic_vector((NB_COL * COL_WIDTH)-1 downto 0) := b"00000000000000000000000000000001";
+    signal src_base_addr : std_logic_vector(ADDR_WIDTH-1 downto 0) := "000000000000";
+    signal length_in_bytes : std_logic_vector((NB_COL * COL_WIDTH)-1 downto 0) := x"00000009";
     signal internal_arvalid : std_logic;
     signal internal_rready : std_logic;
     type STATES is (IDLE,READ,FINAL_READING,FINAL,DONE);
@@ -50,17 +50,34 @@ architecture behavioural of axi4_lite_master is
     signal mydata : ram_type := (others => (others => '0'));
     signal internal_araddr : std_logic_vector(ADDR_WIDTH-1 downto 0) := (others => '0');
 
-    function to_hex(slv : std_logic_vector) return string is
-    constant hex_chars : string(1 to 16) := "0123456789ABCDEF";
-    variable hex    : string(1 to slv'length/4);
-    variable nibble : std_logic_vector(3 downto 0);
-begin
-    for i in hex'range loop
-        nibble := slv(slv'high - (i-1)*4 downto slv'high - (i-1)*4 - 3);
-        hex(i) := hex_chars(to_integer(unsigned(nibble)) + 1);
-    end loop;
-    return hex;
-end function;
+     function to_hex(slv : std_logic_vector) return string is --hex function
+        variable hex    : string(1 to slv'length/4);
+        variable nibble : std_logic_vector(3 downto 0);
+    begin
+        for i in hex'range loop
+            nibble := slv(slv'high - (i-1)*4 downto slv'high - (i-1)*4 - 3);
+            case nibble is
+                when "0000" => hex(i) := '0';
+                when "0001" => hex(i) := '1';
+                when "0010" => hex(i) := '2';
+                when "0011" => hex(i) := '3';
+                when "0100" => hex(i) := '4';
+                when "0101" => hex(i) := '5';
+                when "0110" => hex(i) := '6';
+                when "0111" => hex(i) := '7';
+                when "1000" => hex(i) := '8';
+                when "1001" => hex(i) := '9';
+                when "1010" => hex(i) := 'A';
+                when "1011" => hex(i) := 'B';
+                when "1100" => hex(i) := 'C';
+                when "1101" => hex(i) := 'D';
+                when "1110" => hex(i) := 'E';
+                when "1111" => hex(i) := 'F';
+                when others => hex(i) := 'X'; -- covers U, Z, -, W, etc.
+            end case;
+        end loop;
+        return hex;
+    end function;
 
 begin 
     process(areset_n,aclk) --READ
@@ -76,6 +93,8 @@ begin
            internal_arvalid <= '0';
             s_axilt_awvalid <= '0';
             s_axilt_wvalid <= '0';
+            STATE <= IDLE;
+            counter := 0;
         elsif rising_edge(aclk) then
           case (state) is
            when IDLE =>   
@@ -108,16 +127,16 @@ begin
                 counter := counter + 1;
                 if counter /= how_many_reads then
                     state <= READ;
-                    internal_araddr <= std_logic_vector(unsigned(src_base_addr) + to_unsigned(counter * 4, ADDR_WIDTH));
+                    internal_araddr <= std_logic_vector(unsigned(src_base_addr) + (counter * 4));
                 elsif final_read = 0 then
                     state <= FINAL;
                 else 
                 state <= FINAL_READING;
-                 internal_araddr <= std_logic_vector(unsigned(src_base_addr) + to_unsigned(counter * 4, ADDR_WIDTH));
+                 internal_araddr <= std_logic_vector(unsigned(src_base_addr) + (counter * 4));
             end if;
             end if;
             when FINAL_READING => 
-                if internal_araddr /= "111111111111" then
+                if internal_araddr /= b"111111111111" then
                 internal_arvalid <= '1';
                 internal_rready <= '1';
                 end if;
