@@ -38,6 +38,46 @@ entity axi4_lite_master is
 end axi4_lite_master;
 
 architecture behavioural of axi4_lite_master is
-    signal dst_base_addr : std_logic_vector (ADDR_WIDTH-1 downto 0);
-    signal bytes_lenght : std_logic_vector ((NB_COL * COL_WIDTH)-1 downto 0) : x"00000009";
-    signal mydata
+    signal dst_base_addr : std_logic_vector (ADDR_WIDTH-1 downto 0) := b"000000000000";
+    signal lenght_in_bytes : std_logic_vector ((NB_COL * COL_WIDTH)-1 downto 0) := x"00000009";
+    type STATES is (IDLE,WRITE,FINAL_WRITING,FINAL,DONE);
+    signal state : STATES:= IDLE;
+    type ram_type is array (0 to SIZE - 1) of std_logic_vector(NB_COL * COL_WIDTH - 1 downto 0);
+    signal internal_awaddr : STD_LOGIC_VECTOR (ADDR_WIDTH-1 downto 0);
+    signal mydata : ram_type := ( 
+        0      => x"dead1111",
+        1      => x"dead2222",
+        2      => x"00000033",
+        others => (others => '0'));
+        
+    begin;
+
+    process(aclk, areset_n)
+
+    variable counter : integer := 0;
+    variable how_many_reads : integer;
+    variable final_read : integer;
+    variable bytes_in_int : integer;
+    variable mask : std_logic_vector(NB_COL * COL_WIDTH - 1 downto 0) := (others => '0');
+
+    begin; 
+
+    if areset_n = '0' then 
+        s_axilt_awvalid = '0';
+        s_axilt_wvalid = '0';
+    elsif rising_edge(aclk) then
+        case (state) is
+            when IDLE =>
+                bytes_in_int:= to_integer(unsigned(length_in_bytes));
+                how_many_reads:= bytes_in_int / 4;
+                final_read:= bytes_in_int mod 4; 
+                internal_awaddr <= dst_base_addr;
+                if how_many_reads /= 0 then
+                    state <= WRITE;
+                else state <= FINAL_WRITING;
+                end if;
+            when WRITE =>     
+
+
+
+    
