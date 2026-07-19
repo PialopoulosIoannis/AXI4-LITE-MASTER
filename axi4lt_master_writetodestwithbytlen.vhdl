@@ -68,8 +68,8 @@ architecture behavioural of axi4_lite_master is
     begin 
 
     if areset_n = '0' then 
-        s_axilt_awvalid <= '0';
-        s_axilt_wvalid <= '0';
+        internal_awvalid <= '0';
+        internal_wvalid <= '0';
         counter := 0;
         state <= IDLE;
         how_many_writes := 0;
