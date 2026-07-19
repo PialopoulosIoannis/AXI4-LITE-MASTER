@@ -52,6 +52,8 @@ architecture behavioural of axi4_lite_master is
     signal internal_wvalid : std_logic;
     signal internal_awvalid : std_logic;    
     signal internal_bready : std_logic;
+    signal w_done : std_logic;
+    signal aw_done : std_logic;
         
     begin
 
@@ -75,6 +77,8 @@ architecture behavioural of axi4_lite_master is
         bytes_in_int := 0;
         internal_bready <= '0';
         s_axilt_wstrb <= (others => '1');
+        w_done <= '0';
+        aw_done <= '0';
 
     elsif rising_edge(aclk) then
         case (state) is
@@ -90,18 +94,32 @@ architecture behavioural of axi4_lite_master is
                 if how_many_writes /= 0 then
                     state <= WRITE;
                 else state <= FINAL_WRITING;
+                     case (final_write) is
+                            when 1 =>
+                                s_axilt_wstrb <= "0001";
+                            when 2 =>
+                                s_axilt_wstrb <= "0011";
+                            when 3 =>
+                                s_axilt_wstrb <= "0111";
+                            when others =>
+                                s_axilt_wstrb <= (others => '1');
+                        end case;
                 end if;
             when WRITE =>
                     if internal_awvalid = '1' and s_axilt_awready = '1' then
-                        internal_awvalid <= '0';
+                        internal_awvalid <= '0'; 
+                        aw_done <= '1';
                     end if;
                     if internal_wvalid = '1' and s_axilt_wready = '1' then
                         internal_wvalid <= '0';
                         internal_bready <= '1';
+                        w_done <= '1';
                     end if;
-                    if internal_bready = '1' and s_axilt_bvalid = '1' then
+                    if internal_bready = '1' and s_axilt_bvalid = '1' and w_done = '1' and aw_done = '1' then
                         internal_bready <= '0';
                         counter := counter + 1;
+                        w_done <= '0';
+                        aw_done <= '0';
                         if counter /= how_many_writes then
                             state <= WRITE;
                             s_axilt_wdata <= mydata(counter);
@@ -131,14 +149,18 @@ architecture behavioural of axi4_lite_master is
             when FINAL_WRITING =>
                     if internal_awvalid = '1' and s_axilt_awready = '1' then
                         internal_awvalid <= '0';
+                        aw_done <= '1';
                     end if;
                     if internal_wvalid = '1' and s_axilt_wready = '1' then
                         internal_wvalid <= '0';
                         internal_bready <= '1';
+                        w_done <= '1';
                     end if;
-                    if internal_bready = '1' and s_axilt_bvalid = '1' then
+                    if internal_bready = '1' and s_axilt_bvalid = '1' and w_done = '1' and aw_done = '1' then
                         internal_bready <= '0';
                         counter := counter + 1;
+                        w_done <= '0';
+                        aw_done <= '0';
                         state <= FINAL;
                     end if;
             when FINAL =>
