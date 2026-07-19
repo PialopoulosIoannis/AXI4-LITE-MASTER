@@ -49,6 +49,9 @@ architecture behavioural of axi4_lite_master is
         1      => x"dead2222",
         2      => x"00000033",
         others => (others => '0'));
+    signal internal_wvalid : std_logic;
+    signal internal_awvalid : std_logic;    
+    signal internal_bready : std_logic;
         
     begin;
 
@@ -56,40 +59,100 @@ architecture behavioural of axi4_lite_master is
 
     variable counter : integer := 0;
     variable how_many_reads : integer;
-    variable final_read : integer;
+    variable final_write : integer;
     variable bytes_in_int : integer;
     variable mask : std_logic_vector(NB_COL * COL_WIDTH - 1 downto 0) := (others => '0');
 
     begin; 
 
     if areset_n = '0' then 
-        s_axilt_awvalid = '0';
-        s_axilt_wvalid = '0';
+        s_axilt_awvalid <= '0';
+        s_axilt_wvalid <= '0';
+        counter := 0;
+        state <= IDLE;
+        how_many_reads := '0';
+        final_write := '0';
+        bytes_in_int := '0';
+        internal_bready = '0';
+        s_axilt_wstrb <= (others => '1');
+
     elsif rising_edge(aclk) then
         case (state) is
             when IDLE =>
                 bytes_in_int:= to_integer(unsigned(length_in_bytes));
                 how_many_reads:= bytes_in_int / 4;
-                final_read:= bytes_in_int mod 4; 
+                final_write:= bytes_in_int mod 4; 
+                s_axilt_wstrb <= (others => '1');
                 internal_awaddr <= dst_base_addr;
+                internal_awvalid <= 1;
+                internal_wvalid <= 1;
+                s_axilt_wdata <= mydata(counter);
                 if how_many_reads /= 0 then
                     state <= WRITE;
                 else state <= FINAL_WRITING;
                 end if;
             when WRITE =>
-
-
-
-
-
-
-
-
-
-
-
+                    if internal_awvalid = '1' and s_axilt_awready = '1' then
+                        internal_awvalid = '0';
+                    end if;
+                    if internal_wvalid = '1' and s_axilt_wready = '1' then
+                        internal_wvalid = '0';
+                        internal_bready = '1';
+                    end if;
+                    if internal_bready = '1' and s_axilt_bvalid = '1' then
+                        internal_bready = '0';
+                        counter := counter + 1;
+                        if counter /= how_many_reads then
+                            state <= WRITE;
+                            s_axilt_wdata <= mydata(counter);
+                            internal_awaddr <= std_logic_vector(unsigned(dst_base_addr) + (counter * 4));
+                            internal_awvalid = '1';
+                            internal_wvalid = '1';
+                        elsif final_write = 0 then
+                            state <= FINAL;
+                        else 
+                        state <= FINAL_WRITING;
+                        case (final_write) is
+                            when 1 =>
+                                s_axilt_wstrb <= "0001";
+                            when 2 =>
+                                s_axilt_wstrb <= "0011";
+                            when 3 =>
+                                s_axilt_wstrb <= "0111";
+                            when others =>
+                                s_axilt_wstrb <= (others => '1');
+                        end case;
+                        internal_araddr <= std_logic_vector(unsigned(src_base_addr) + (counter * 4));
+                        s_axilt_wdata <= mydata(counter)
+                        internal_awvalid = '1';
+                        internal_wvalid = '1';
+                        end if;
+                    end if;
+            when FINAL_WRITING =>
+                    if internal_awvalid = '1' and s_axilt_awready = '1' then
+                        internal_awvalid = '0';
+                    end if;
+                    if internal_wvalid = '1' and s_axilt_wready = '1' then
+                        internal_wvalid = '0';
+                        internal_bready = '1';
+                    end if;
+                    if internal_bready = '1' and s_axilt_bvalid = '1' then
+                        internal_bready = '0';
+                        counter := counter + 1;
+                        state <= FINAL;
+                    end if;
+            when FINAL =>
+                    report "DATA WRITTEN";
+                    state <= DONE;
+            when DONE =>
+                null;
+        end case;
+    end if;
     end process;
     s_axilt_awaddr <= internal_awaddr;
+    s_axilt_wvalid <= internal_wvalid;
+    s_axilt_awvalid <= internal_awvalid;
+    s_axilt_bready <= internal_bready;
 
 end behavioural;
 
