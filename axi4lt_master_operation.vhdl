@@ -72,8 +72,8 @@ architecture behavioural of axi4_lite_master is
         if start = '1' then
         if areset_n = '0' then 
            internal_arvalid <= '0';
-            s_axilt_awvalid <= '0';
-            s_axilt_wvalid <= '0';
+            internal_awvalid <= '0';
+            internal_wvalid <= '0';
             state_r <= IDLE_R;
             counter := 0;
             internal_araddr <= src_base_addr;
@@ -96,7 +96,7 @@ architecture behavioural of axi4_lite_master is
                 else state_r <= FINAL_READING;
                 end if;
            when READ =>
-                if internal_araddr /= "11111111" then
+                if internal_araddr /= b"111111111111" then
                 internal_arvalid <= '1';
                 internal_rready <= '1';
             end if;
@@ -179,10 +179,10 @@ architecture behavioural of axi4_lite_master is
                 how_many_writes:= bytes_in_int_w / 4;
                 final_write:= bytes_in_int_w mod 4; 
                 s_axilt_wstrb <= (others => '1');
-                internal_awvalid <= '1';
-                internal_wvalid <= '1';
                 if ok(counter) = '1' then
                     s_axilt_wdata <= mydata(counter);
+                    internal_awvalid <= '1';
+                    internal_wvalid <= '1';
                     if how_many_writes /= 0 then
                         state_w <= WRITE;
                     else state_w <= FINAL_WRITING;
@@ -276,6 +276,8 @@ architecture behavioural of axi4_lite_master is
     s_axilt_wvalid <= internal_wvalid;
     s_axilt_awvalid <= internal_awvalid;
     s_axilt_bready <= internal_bready;
+    s_axilt_araddr <= internal_araddr;
+    s_axilt_rready <= internal_rready;
 
 end behavioural;
 
