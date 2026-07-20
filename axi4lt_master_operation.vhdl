@@ -41,6 +41,7 @@ architecture behavioural of axi4_lite_master is
     signal dst_base_addr : std_logic_vector (ADDR_WIDTH-1 downto 0) := b"000000000000";
     signal src_base_addr : std_logic_vector(ADDR_WIDTH-1 downto 0) := b"000000000000";
     signal length_in_bytes : std_logic_vector ((NB_COL * COL_WIDTH)-1 downto 0) := x"00000009";
+    signal start : std_logic := '1';
     type STATES is (IDLE_R,IDLE_W,READ,FINAL_READING,WRITE,FINAL_WRITING,FINAL_W,FINAL_R,DONE_W,DONE_R);
     signal state_r : STATES:= IDLE_R;
     signal state_w : STATES := IDLE_W;
@@ -72,6 +73,7 @@ architecture behavioural of axi4_lite_master is
     variable mask : std_logic_vector(NB_COL * COL_WIDTH - 1 downto 0) := (others => '0');
     
     begin
+        if start = '1' then
         if areset_n = '0' then 
            internal_arvalid <= '0';
             s_axilt_awvalid <= '0';
@@ -146,6 +148,7 @@ architecture behavioural of axi4_lite_master is
             null;
             end case; 
              end if;
+             end if;
             end process;
 
     process(aclk, areset_n) --WRITE TO
@@ -157,7 +160,7 @@ architecture behavioural of axi4_lite_master is
     variable mask : std_logic_vector(NB_COL * COL_WIDTH - 1 downto 0) := (others => '0');
 
     begin 
-
+    if start = '1' then
     if areset_n = '0' then 
         internal_awvalid <= '0';
         internal_wvalid <= '0';
@@ -267,6 +270,7 @@ architecture behavioural of axi4_lite_master is
             when DONE_W =>
                 null;
         end case;
+    end if;
     end if;
     end process;
     s_axilt_awaddr <= internal_awaddr;
