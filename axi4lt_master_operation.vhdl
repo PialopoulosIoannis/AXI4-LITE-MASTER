@@ -42,9 +42,10 @@ architecture behavioural of axi4_lite_master is
     signal src_base_addr : std_logic_vector(ADDR_WIDTH-1 downto 0) := b"000000000000";
     signal length_in_bytes : std_logic_vector ((NB_COL * COL_WIDTH)-1 downto 0) := x"00000009";
     signal start : std_logic := '1';
-    type STATES is (IDLE_R,IDLE_W,READ,FINAL_READING,WRITE,FINAL_WRITING,FINAL_W,FINAL_R,DONE_W,DONE_R);
-    signal state_r : STATES:= IDLE_R;
-    signal state_w : STATES := IDLE_W;
+    type READ_STATES is (IDLE_R,READ,FINAL_READING,FINAL_R,DONE_R);
+    type WRITE_STATES is (IDLE_W,WRITE,FINAL_WRITING,FINAL_W,DONE_W);
+    signal state_r : READ_STATES:= IDLE_R;
+    signal state_w : WRITE_STATES := IDLE_W;
     type ram_type is array (0 to SIZE - 1) of std_logic_vector(NB_COL * COL_WIDTH - 1 downto 0);
     signal internal_awaddr : STD_LOGIC_VECTOR (ADDR_WIDTH-1 downto 0);
     signal ok : std_logic_vector (SIZE - 1 downto 0) := (others => '0');
