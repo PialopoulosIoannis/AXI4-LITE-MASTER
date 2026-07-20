@@ -38,7 +38,7 @@ entity axi4_lite_master is
 end axi4_lite_master;
 
 architecture behavioural of axi4_lite_master is
-    signal dst_base_addr : std_logic_vector (ADDR_WIDTH-1 downto 0) := b"000000000000";
+    signal dst_base_addr : std_logic_vector (ADDR_WIDTH-1 downto 0) := b"000000010000";
     signal src_base_addr : std_logic_vector(ADDR_WIDTH-1 downto 0) := b"000000000000";
     signal length_in_bytes : std_logic_vector ((NB_COL * COL_WIDTH)-1 downto 0) := x"00000009";
     signal start : std_logic := '1';
@@ -48,11 +48,7 @@ architecture behavioural of axi4_lite_master is
     type ram_type is array (0 to SIZE - 1) of std_logic_vector(NB_COL * COL_WIDTH - 1 downto 0);
     signal internal_awaddr : STD_LOGIC_VECTOR (ADDR_WIDTH-1 downto 0);
     signal ok : std_logic_vector (SIZE - 1 downto 0) := (others => '0');
-    signal mydata : ram_type := ( 
-        0      => x"dead1111",
-        1      => x"dead2222",
-        2      => x"00000033",
-        others => (others => '0'));
+    signal mydata : ram_type := (others => (others => '0'));
     signal internal_wvalid : std_logic;
     signal internal_awvalid : std_logic;    
     signal internal_bready : std_logic;
@@ -69,7 +65,7 @@ architecture behavioural of axi4_lite_master is
     variable counter : integer := 0;
     variable how_many_reads : integer;
     variable final_read : integer;
-    variable bytes_in_int : integer;
+    variable bytes_in_int_r : integer;
     variable mask : std_logic_vector(NB_COL * COL_WIDTH - 1 downto 0) := (others => '0');
     
     begin
@@ -85,9 +81,9 @@ architecture behavioural of axi4_lite_master is
         elsif rising_edge(aclk) then
           case (state_r) is
            when IDLE_R =>   
-                bytes_in_int:= to_integer(unsigned(length_in_bytes));
-                how_many_reads:= bytes_in_int / 4;
-                final_read:= bytes_in_int mod 4; 
+                bytes_in_int_r:= to_integer(unsigned(length_in_bytes));
+                how_many_reads:= bytes_in_int_r / 4;
+                final_read:= bytes_in_int_r mod 4; 
                 for i in 0 to (NB_COL * COL_WIDTH) - 1 loop
                         if i< final_read*8 then
                             mask(i) := '1';
@@ -133,7 +129,7 @@ architecture behavioural of axi4_lite_master is
                 if s_axilt_rvalid = '1' and internal_rready = '1' then 
                     internal_rready <= '0';
                     mydata(counter) <= mask and s_axilt_rdata;
-                    ok(counter) = '1';
+                    ok(counter) <= '1';
                     counter := counter + 1;
                     state_r <= FINAL_R;
                 end if;
@@ -156,7 +152,7 @@ architecture behavioural of axi4_lite_master is
     variable counter : integer := 0;
     variable how_many_writes : integer;
     variable final_write : integer;
-    variable bytes_in_int : integer;
+    variable bytes_in_int_w : integer;
     variable mask : std_logic_vector(NB_COL * COL_WIDTH - 1 downto 0) := (others => '0');
 
     begin 
@@ -168,7 +164,7 @@ architecture behavioural of axi4_lite_master is
         state_w <= IDLE_W;
         how_many_writes := 0;
         final_write := 0;
-        bytes_in_int := 0;
+        bytes_in_int_w := 0;
         internal_bready <= '0';
         s_axilt_wstrb <= (others => '1');
         w_done <= '0';
@@ -179,9 +175,9 @@ architecture behavioural of axi4_lite_master is
     elsif rising_edge(aclk) then
         case (state_w) is
             when IDLE_W =>
-                bytes_in_int:= to_integer(unsigned(length_in_bytes));
-                how_many_writes:= bytes_in_int / 4;
-                final_write:= bytes_in_int mod 4; 
+                bytes_in_int_w:= to_integer(unsigned(length_in_bytes));
+                how_many_writes:= bytes_in_int_w / 4;
+                final_write:= bytes_in_int_w mod 4; 
                 s_axilt_wstrb <= (others => '1');
                 internal_awvalid <= '1';
                 internal_wvalid <= '1';
@@ -201,7 +197,8 @@ architecture behavioural of axi4_lite_master is
                                     s_axilt_wstrb <= (others => '1');
                             end case;
                     end if;
-                else state_w <= IDLE_W;    
+                else state_w <= IDLE_W; 
+                end if;   
             when WRITE =>
                     if ok(counter) = '1' then        
                         if internal_awvalid = '1' and s_axilt_awready = '1' then
@@ -225,7 +222,7 @@ architecture behavioural of axi4_lite_master is
                                 internal_awvalid <= '1';
                                 internal_wvalid <= '1';
                             elsif final_write = 0 then
-                                state_w <= FINAL;
+                                state_w <= FINAL_W;
                             else 
                             state_w <= FINAL_WRITING;
                             case (final_write) is
@@ -244,7 +241,8 @@ architecture behavioural of axi4_lite_master is
                             internal_wvalid <= '1';
                             end if;
                         end if;
-                    else state_w <= WRITE;    
+                    else state_w <= WRITE;   
+                    end if; 
             when FINAL_WRITING =>
                     if ok(counter) = '1' then
                         if internal_awvalid = '1' and s_axilt_awready = '1' then
@@ -263,7 +261,8 @@ architecture behavioural of axi4_lite_master is
                             aw_done <= '0';
                             state_w <= FINAL_W;
                         end if;
-                    else state_w <= FINAL_WRITING;    
+                    else state_w <= FINAL_WRITING;  
+                    end if;  
             when FINAL_W =>
                     report "DATA WRITTEN";
                     state_w <= DONE_W;
