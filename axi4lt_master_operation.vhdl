@@ -124,7 +124,7 @@ architecture behavioural of axi4_lite_master is
                         internal_araddr <= std_logic_vector(unsigned(src_base_addr) + (counter * 4));
                     end if;
                     end if;
-                else state <= READ;
+                else state_r <= READ;
                 end if;    
 
             when FINAL_READING => 
@@ -143,7 +143,7 @@ architecture behavioural of axi4_lite_master is
                         counter := counter + 1;
                         state_r <= FINAL_R;
                     end if;
-                else state <= FINAL_READING
+                else state_r <= FINAL_READING
                 end if;
             when FINAL_R =>
                     report "DATA READ ";
@@ -186,7 +186,7 @@ architecture behavioural of axi4_lite_master is
 
     elsif rising_edge(aclk) then
         case (state_w) is
-            when IDLE_W => --EDO EIMAI
+            when IDLE_W => 
                 if buffer_ready = '1' then
                     bytes_in_int_w:= to_integer(unsigned(length_in_bytes));
                     how_many_writes:= bytes_in_int_w / 4;
@@ -213,6 +213,7 @@ architecture behavioural of axi4_lite_master is
                         end if;
             when WRITE =>
                 if buffer_ready = '1' then
+                    s_axilt_wdata <= buffer;
                         if internal_awvalid = '1' and s_axilt_awready = '1' then
                             internal_awvalid <= '0'; 
                             aw_done <= '1';
@@ -227,9 +228,9 @@ architecture behavioural of axi4_lite_master is
                             counter := counter + 1;
                             w_done <= '0';
                             aw_done <= '0';
+                            buffer_ready <= '0';
                             if counter /= how_many_writes then
                                 state_w <= WRITE;
-                                s_axilt_wdata <= mydata(counter);
                                 internal_awaddr <= std_logic_vector(unsigned(dst_base_addr) + (counter * 4));
                                 internal_awvalid <= '1';
                                 internal_wvalid <= '1';
@@ -248,12 +249,15 @@ architecture behavioural of axi4_lite_master is
                                     s_axilt_wstrb <= (others => '1');
                             end case;
                             internal_awaddr <= std_logic_vector(unsigned(dst_base_addr) + (counter * 4));
-                            s_axilt_wdata <= mydata(counter);
                             internal_awvalid <= '1';
                             internal_wvalid <= '1';
                             end if;
                         end if;
+                        else state_w <= WRITE;
+                end if;
             when FINAL_WRITING =>
+                    if buffer_ready = '1' then
+                        s_axilt_wdata <= buffer;
                         if internal_awvalid = '1' and s_axilt_awready = '1' then
                             internal_awvalid <= '0';
                             aw_done <= '1';
@@ -268,8 +272,11 @@ architecture behavioural of axi4_lite_master is
                             counter := counter + 1;
                             w_done <= '0';
                             aw_done <= '0';
+                            buffer_ready <= '0';
                             state_w <= FINAL_W;
                         end if;
+                        else state_w <= FINAL_WRITING;
+                    end if;
             when FINAL_W =>
                     report "DATA WRITTEN";
                     state_w <= DONE_W;
