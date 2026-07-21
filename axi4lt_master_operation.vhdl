@@ -48,8 +48,6 @@ architecture behavioural of axi4_lite_master is
     signal state_w : WRITE_STATES := IDLE_W;
     type ram_type is array (0 to SIZE - 1) of std_logic_vector(NB_COL * COL_WIDTH - 1 downto 0);
     signal internal_awaddr : STD_LOGIC_VECTOR (ADDR_WIDTH-1 downto 0);
-    signal ok : std_logic_vector (SIZE - 1 downto 0) := (others => '0');
-    signal mydata : ram_type := (others => (others => '0'));
     signal data_buffer : std_logic_vector(NB_COL * COL_WIDTH - 1 downto 0) := (others => '0');
     signal buffer_ready : std_logic := '0';
     signal internal_wvalid : std_logic;
@@ -307,6 +305,7 @@ architecture behavioural of axi4_lite_master is
     end process;
     s_axilt_awaddr <= internal_awaddr;
     s_axilt_wvalid <= internal_wvalid;
+    s_axilt_arvalid <= internal_arvalid;
     s_axilt_awvalid <= internal_awvalid;
     s_axilt_bready <= internal_bready;
     s_axilt_araddr <= internal_araddr;
