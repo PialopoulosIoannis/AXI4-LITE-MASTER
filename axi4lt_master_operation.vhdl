@@ -74,8 +74,6 @@ architecture behavioural of axi4_lite_master is
         if start = '1' then
         if areset_n = '0' then 
            internal_arvalid <= '0';
-            internal_awvalid <= '0';
-            internal_wvalid <= '0';
             state_r <= IDLE_R;
             counter := 0;
             buffer_ready_r <= '0';
