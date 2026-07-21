@@ -42,7 +42,7 @@ architecture behavioural of axi4_lite_master is
     signal src_base_addr : std_logic_vector(ADDR_WIDTH-1 downto 0) := b"000000000000";
     signal length_in_bytes : std_logic_vector ((NB_COL * COL_WIDTH)-1 downto 0) := x"00000009";
     signal start : std_logic := '1';
-    type READ_STATES is (IDLE_R,READ,FINAL_READING,FINAL_R,DONE_R,WAITING_R);
+    type READ_STATES is (IDLE_R,READ,FINAL_READING,FINAL_R,DONE_R,WAITING_R,WAITING_R_1,WAITING_R_2);
     type WRITE_STATES is (IDLE_W,WRITE,FINAL_WRITING,FINAL_W,DONE_W,WAITING_W,WAITING_1);
     signal state_r : READ_STATES:= IDLE_R;
     signal state_w : WRITE_STATES := IDLE_W;
@@ -110,8 +110,12 @@ architecture behavioural of axi4_lite_master is
                         buffer_ready_r <= '1';
                         counter := counter + 1;
                          internal_araddr <= std_logic_vector(unsigned(src_base_addr) + (counter * 4));
-                        state_r <= WAITING_R;
+                        state_r <= WAITING_R_1;
                     end if;
+                    when WAITING_R_1 =>
+                    state_r <= WAITING_R_2;
+                    when WAITING_R_2 =>
+                    state_r <= WAITING_R;
             when WAITING_R =>
             if buffer_ready_w = '1' then
                 buffer_ready_r <='0';
