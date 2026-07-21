@@ -109,6 +109,7 @@ architecture behavioural of axi4_lite_master is
                         data_buffer <= s_axilt_rdata;
                         buffer_ready_r <= '1';
                         counter := counter + 1;
+                         internal_araddr <= std_logic_vector(unsigned(src_base_addr) + (counter * 4));
                         state_r <= WAITING_R;
                     end if;
             when WAITING_R =>
@@ -116,7 +117,6 @@ architecture behavioural of axi4_lite_master is
                 buffer_ready_r <='0';
                 if counter /= how_many_reads then
                             state_r <= READ;
-                            internal_araddr <= std_logic_vector(unsigned(src_base_addr) + (counter * 4));
                         elsif final_read = 0 then
                             state_r <= FINAL_R;
                         else 
