@@ -211,7 +211,6 @@ architecture behavioural of axi4_lite_master is
                         else state_w <= IDLE_W;
                         end if;
             when WRITE =>
-                if buffer_ready_r = '1' then
                         if internal_awvalid = '1' and s_axilt_awready = '1' then
                             internal_awvalid <= '0'; 
                             aw_done <= '1';
@@ -229,10 +228,6 @@ architecture behavioural of axi4_lite_master is
                             buffer_ready_w <= '1';
                             state_w <= WAITING_1;
                         end if;
-                        else state_w <= WAITING_1;
-                        internal_awvalid <= '0';
-                        internal_wvalid <= '0';
-                end if;
                 when WAITING_1 =>
                             state_w <= WAITING_W;
             when WAITING_W =>
@@ -250,7 +245,6 @@ architecture behavioural of axi4_lite_master is
             else state_w <= WAITING_W; 
             end if;
             when FINAL_WRITING =>
-                    if buffer_ready_r = '1' then
                         if internal_awvalid = '1' and s_axilt_awready = '1' then
                             internal_awvalid <= '0';
                             aw_done <= '1';
@@ -268,10 +262,6 @@ architecture behavioural of axi4_lite_master is
                             buffer_ready_w <= '1';
                             state_w <= FINAL_W;
                         end if;
-                        else state_w <= WAITING_1;
-                            internal_awvalid <= '0';
-                            internal_wvalid <= '0';
-                    end if;
             when FINAL_W =>
                     report "DATA WRITTEN";
                     state_w <= DONE_W;
