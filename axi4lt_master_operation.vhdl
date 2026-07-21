@@ -125,7 +125,6 @@ architecture behavioural of axi4_lite_master is
                     end if;
                     end if;
             when FINAL_READING => 
-                if buffer_ready_w = '0' then
                     if internal_araddr /= b"111111111111" then
                     internal_arvalid <= '1';
                     internal_rready <= '1';
@@ -140,8 +139,6 @@ architecture behavioural of axi4_lite_master is
                         counter := counter + 1;
                         state_r <= FINAL_R;
                     end if;
-                else state_r <= FINAL_READING;
-                end if;
             when FINAL_R =>
                     report "DATA READ ";
                     --for i in 0 to counter-1 loop 
@@ -228,7 +225,7 @@ architecture behavioural of axi4_lite_master is
                             buffer_ready_w <= '1';
                             state_w <= WAITING_1;
                         end if;
-                        else state_w <= WAITING_W;
+                        else state_w <= WAITING_1;
                         internal_awvalid <= '0';
                         internal_wvalid <= '0';
                 end if;
