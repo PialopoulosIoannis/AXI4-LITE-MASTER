@@ -50,6 +50,9 @@ architecture behavioural of axi4_lite_master is
     signal internal_awaddr : STD_LOGIC_VECTOR (ADDR_WIDTH-1 downto 0);
     signal ok : std_logic_vector (SIZE - 1 downto 0) := (others => '0');
     signal mydata : ram_type := (others => (others => '0'));
+    signal buffer : std_logic_vector(NB_COL * COL_WIDTH - 1 downto 0) := (others => '0');
+    signal buffer_ready : std_logic := '0';
+    signal buffer_used : std_logic := '0';
     signal internal_wvalid : std_logic;
     signal internal_awvalid : std_logic;    
     signal internal_bready : std_logic;
@@ -77,6 +80,7 @@ architecture behavioural of axi4_lite_master is
             internal_wvalid <= '0';
             state_r <= IDLE_R;
             counter := 0;
+            buffer_ready <= '0';
             internal_araddr <= src_base_addr;
 
         elsif rising_edge(aclk) then
@@ -97,42 +101,49 @@ architecture behavioural of axi4_lite_master is
                 else state_r <= FINAL_READING;
                 end if;
            when READ =>
-                if internal_araddr /= b"111111111111" then
-                internal_arvalid <= '1';
-                internal_rready <= '1';
-            end if;
-            if internal_arvalid = '1' and s_axilt_arready = '1' then
-                internal_arvalid <= '0';
-            end if;
-            if s_axilt_rvalid = '1' and internal_rready = '1' then 
-                internal_rready <= '0';
-                mydata(counter) <= s_axilt_rdata;
-                ok(counter) <= '1';
-                counter := counter + 1;
-                if counter /= how_many_reads then
-                    state_r <= READ;
-                    internal_araddr <= std_logic_vector(unsigned(src_base_addr) + (counter * 4));
-                elsif final_read = 0 then
-                    state_r <= FINAL_R;
-                else 
-                state_r <= FINAL_READING;
-                 internal_araddr <= std_logic_vector(unsigned(src_base_addr) + (counter * 4));
-            end if;
-            end if;
+                if buffer_ready = '0' then 
+                        if internal_araddr /= b"111111111111" then
+                        internal_arvalid <= '1';
+                        internal_rready <= '1';
+                    end if;
+                    if internal_arvalid = '1' and s_axilt_arready = '1' then
+                        internal_arvalid <= '0';
+                    end if;
+                    if s_axilt_rvalid = '1' and internal_rready = '1' then 
+                        internal_rready <= '0';
+                        buffer <= s_axilt_rdata;
+                        buffer_ready <= '1';
+                        counter := counter + 1;
+                        if counter /= how_many_reads then
+                            state_r <= READ;
+                            internal_araddr <= std_logic_vector(unsigned(src_base_addr) + (counter * 4));
+                        elsif final_read = 0 then
+                            state_r <= FINAL_R;
+                        else 
+                        state_r <= FINAL_READING;
+                        internal_araddr <= std_logic_vector(unsigned(src_base_addr) + (counter * 4));
+                    end if;
+                    end if;
+                else state <= READ;
+                end if;    
+
             when FINAL_READING => 
-                if internal_araddr /= b"111111111111" then
-                internal_arvalid <= '1';
-                internal_rready <= '1';
-                end if;
-                if internal_arvalid = '1' and s_axilt_arready = '1' then
-                    internal_arvalid <= '0';
-                end if; 
-                if s_axilt_rvalid = '1' and internal_rready = '1' then 
-                    internal_rready <= '0';
-                    mydata(counter) <= mask and s_axilt_rdata;
-                    ok(counter) <= '1';
-                    counter := counter + 1;
-                    state_r <= FINAL_R;
+                if buffer_ready = '0' then
+                    if internal_araddr /= b"111111111111" then
+                    internal_arvalid <= '1';
+                    internal_rready <= '1';
+                    end if;
+                    if internal_arvalid = '1' and s_axilt_arready = '1' then
+                        internal_arvalid <= '0';
+                    end if; 
+                    if s_axilt_rvalid = '1' and internal_rready = '1' then 
+                        internal_rready <= '0';
+                        buffer <= mask and s_axilt_rdata;
+                        buffer_ready <= '1';
+                        counter := counter + 1;
+                        state_r <= FINAL_R;
+                    end if;
+                else state <= FINAL_READING
                 end if;
             when FINAL_R =>
                     report "DATA READ ";
@@ -175,33 +186,33 @@ architecture behavioural of axi4_lite_master is
 
     elsif rising_edge(aclk) then
         case (state_w) is
-            when IDLE_W =>
-                bytes_in_int_w:= to_integer(unsigned(length_in_bytes));
-                how_many_writes:= bytes_in_int_w / 4;
-                final_write:= bytes_in_int_w mod 4; 
-                s_axilt_wstrb <= (others => '1');
-                if ok(counter) = '1' then
-                    s_axilt_wdata <= mydata(counter);
-                    internal_awvalid <= '1';
-                    internal_wvalid <= '1';
-                    if how_many_writes /= 0 then
-                        state_w <= WRITE;
-                    else state_w <= FINAL_WRITING;
-                        case (final_write) is
-                                when 1 =>
-                                    s_axilt_wstrb <= "0001";
-                                when 2 =>
-                                    s_axilt_wstrb <= "0011";
-                                when 3 =>
-                                    s_axilt_wstrb <= "0111";
-                                when others =>
-                                    s_axilt_wstrb <= (others => '1');
-                            end case;
-                    end if;
-                else state_w <= IDLE_W; 
-                end if;   
+            when IDLE_W => --EDO EIMAI
+                if buffer_ready = '1' then
+                    bytes_in_int_w:= to_integer(unsigned(length_in_bytes));
+                    how_many_writes:= bytes_in_int_w / 4;
+                    final_write:= bytes_in_int_w mod 4; 
+                    s_axilt_wstrb <= (others => '1');
+                        s_axilt_wdata <= buffer;
+                        internal_awvalid <= '1';
+                        internal_wvalid <= '1';
+                        if how_many_writes /= 0 then
+                            state_w <= WRITE;
+                        else state_w <= FINAL_WRITING;
+                            case (final_write) is
+                                    when 1 =>
+                                        s_axilt_wstrb <= "0001";
+                                    when 2 =>
+                                        s_axilt_wstrb <= "0011";
+                                    when 3 =>
+                                        s_axilt_wstrb <= "0111";
+                                    when others =>
+                                        s_axilt_wstrb <= (others => '1');
+                                end case;
+                        end if;
+                        else state_w <= IDLE_W;
+                        end if;
             when WRITE =>
-                    if ok(counter) = '1' then        
+                if buffer_ready = '1' then
                         if internal_awvalid = '1' and s_axilt_awready = '1' then
                             internal_awvalid <= '0'; 
                             aw_done <= '1';
@@ -242,10 +253,7 @@ architecture behavioural of axi4_lite_master is
                             internal_wvalid <= '1';
                             end if;
                         end if;
-                    else state_w <= WRITE;   
-                    end if; 
             when FINAL_WRITING =>
-                    if ok(counter) = '1' then
                         if internal_awvalid = '1' and s_axilt_awready = '1' then
                             internal_awvalid <= '0';
                             aw_done <= '1';
@@ -262,8 +270,6 @@ architecture behavioural of axi4_lite_master is
                             aw_done <= '0';
                             state_w <= FINAL_W;
                         end if;
-                    else state_w <= FINAL_WRITING;  
-                    end if;  
             when FINAL_W =>
                     report "DATA WRITTEN";
                     state_w <= DONE_W;
