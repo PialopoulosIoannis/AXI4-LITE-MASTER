@@ -42,14 +42,15 @@ architecture behavioural of axi4_lite_master is
     signal src_base_addr : std_logic_vector(ADDR_WIDTH-1 downto 0) := b"000000000000";
     signal length_in_bytes : std_logic_vector ((NB_COL * COL_WIDTH)-1 downto 0) := x"00000009";
     signal start : std_logic := '1';
-    type READ_STATES is (IDLE_R,READ,FINAL_READING,FINAL_R,DONE_R);
-    type WRITE_STATES is (IDLE_W,WRITE,FINAL_WRITING,FINAL_W,DONE_W,WAITING);
+    type READ_STATES is (IDLE_R,READ,FINAL_READING,FINAL_R,DONE_R,WAITING_R);
+    type WRITE_STATES is (IDLE_W,WRITE,FINAL_WRITING,FINAL_W,DONE_W,WAITING_W,WAITING_1);
     signal state_r : READ_STATES:= IDLE_R;
     signal state_w : WRITE_STATES := IDLE_W;
     type ram_type is array (0 to SIZE - 1) of std_logic_vector(NB_COL * COL_WIDTH - 1 downto 0);
     signal internal_awaddr : STD_LOGIC_VECTOR (ADDR_WIDTH-1 downto 0);
     signal data_buffer : std_logic_vector(NB_COL * COL_WIDTH - 1 downto 0) := (others => '0');
-    signal buffer_ready : std_logic := '0';
+    signal buffer_ready_r : std_logic := '0';
+    signal buffer_ready_w : std_logic := '0';
     signal internal_wvalid : std_logic;
     signal internal_awvalid : std_logic;    
     signal internal_bready : std_logic;
@@ -77,13 +78,12 @@ architecture behavioural of axi4_lite_master is
             internal_wvalid <= '0';
             state_r <= IDLE_R;
             counter := 0;
-            buffer_ready <= '0';
+            buffer_ready_r <= '0';
             internal_araddr <= src_base_addr;
-
+            
         elsif rising_edge(aclk) then
           case (state_r) is
            when IDLE_R =>   
-                if buffer_ready = '0' then
                     bytes_in_int_r:= to_integer(unsigned(length_in_bytes));
                     how_many_reads:= bytes_in_int_r / 4;
                     final_read:= bytes_in_int_r mod 4; 
@@ -101,7 +101,6 @@ architecture behavioural of axi4_lite_master is
                 else state_r <= IDLE_R;
             end if;
            when READ =>
-                if buffer_ready = '0' then 
                         if internal_araddr /= b"111111111111" then
                         internal_arvalid <= '1';
                         internal_rready <= '1';
@@ -112,9 +111,14 @@ architecture behavioural of axi4_lite_master is
                     if s_axilt_rvalid = '1' and internal_rready = '1' then 
                         internal_rready <= '0';
                         data_buffer <= s_axilt_rdata;
-                        buffer_ready <= '1';
+                        buffer_ready_r <= '1';
                         counter := counter + 1;
-                        if counter /= how_many_reads then
+                        state_r <= WAITING_R;
+                    end if;
+            when WAITING_R =>
+            if buffer_ready_w = '1' then
+                buffer_ready_r ='0';
+                if counter /= how_many_reads then
                             state_r <= READ;
                             internal_araddr <= std_logic_vector(unsigned(src_base_addr) + (counter * 4));
                         elsif final_read = 0 then
@@ -124,11 +128,8 @@ architecture behavioural of axi4_lite_master is
                         internal_araddr <= std_logic_vector(unsigned(src_base_addr) + (counter * 4));
                     end if;
                     end if;
-                else state_r <= READ;
-                end if;    
-
             when FINAL_READING => 
-                if buffer_ready = '0' then
+                if buffer_ready_w = '0' then
                     if internal_araddr /= b"111111111111" then
                     internal_arvalid <= '1';
                     internal_rready <= '1';
@@ -139,7 +140,7 @@ architecture behavioural of axi4_lite_master is
                     if s_axilt_rvalid = '1' and internal_rready = '1' then 
                         internal_rready <= '0';
                         data_buffer <= mask and s_axilt_rdata;
-                        buffer_ready <= '1';
+                        buffer_ready_r <= '1';
                         counter := counter + 1;
                         state_r <= FINAL_R;
                     end if;
@@ -187,7 +188,7 @@ architecture behavioural of axi4_lite_master is
     elsif rising_edge(aclk) then
         case (state_w) is
             when IDLE_W => 
-                if buffer_ready = '1' then
+                if buffer_ready_r = '1' then
                     bytes_in_int_w:= to_integer(unsigned(length_in_bytes));
                     how_many_writes:= bytes_in_int_w / 4;
                     final_write:= bytes_in_int_w mod 4; 
@@ -213,7 +214,7 @@ architecture behavioural of axi4_lite_master is
                         else state_w <= IDLE_W;
                         end if;
             when WRITE =>
-                if buffer_ready = '1' then
+                if buffer_ready_r = '1' then
                         if internal_awvalid = '1' and s_axilt_awready = '1' then
                             internal_awvalid <= '0'; 
                             aw_done <= '1';
@@ -228,38 +229,16 @@ architecture behavioural of axi4_lite_master is
                             counter := counter + 1;
                             w_done <= '0';
                             aw_done <= '0';
-                            buffer_ready <= '0';
-                            if counter /= how_many_writes then
-                                state_w <= WRITE;
-                                internal_awaddr <= std_logic_vector(unsigned(dst_base_addr) + (counter * 4));
-                                s_axilt_wdata <= data_buffer;
-                                internal_awvalid <= '1';
-                                internal_wvalid <= '1';
-                            elsif final_write = 0 then
-                                state_w <= FINAL_W;
-                            else 
-                            state_w <= FINAL_WRITING;
-                            internal_awaddr <= std_logic_vector(unsigned(dst_base_addr) + (counter * 4));
-                            internal_awvalid <= '1';
-                            internal_wvalid <= '1';
-                            case (final_write) is
-                                when 1 =>
-                                    s_axilt_wstrb <= "0001";
-                                when 2 =>
-                                    s_axilt_wstrb <= "0011";
-                                when 3 =>
-                                    s_axilt_wstrb <= "0111";
-                                when others =>
-                                    s_axilt_wstrb <= (others => '1');
-                            end case;
-                            end if;
+                            buffer_ready_w <= '1';
                         end if;
-                        else state_w <= WAITING;
+                        else state_w <= WAITING_1;
                         internal_awvalid <= '0';
                         internal_wvalid <= '0';
                 end if;
-            when WAITING =>
-            if buffer_ready = '1' then
+                when WAITING_1 =>
+                            state_w <= WAITING_W;
+            when WAITING_W =>
+            if buffer_ready_r = '1' then
                 internal_awvalid <= '1';
                 internal_wvalid <= '1';
                 s_axilt_wdata <= data_buffer;
@@ -272,7 +251,7 @@ architecture behavioural of axi4_lite_master is
             else state_w <= WAITING; 
             end if;
             when FINAL_WRITING =>
-                    if buffer_ready = '1' then
+                    if buffer_ready_r = '1' then
                         if internal_awvalid = '1' and s_axilt_awready = '1' then
                             internal_awvalid <= '0';
                             aw_done <= '1';
@@ -287,7 +266,7 @@ architecture behavioural of axi4_lite_master is
                             counter := counter + 1;
                             w_done <= '0';
                             aw_done <= '0';
-                            buffer_ready <= '0';
+                            buffer_ready_w <= '1';
                             state_w <= FINAL_W;
                         end if;
                         else state_w <= WAITING;
