@@ -239,6 +239,7 @@ architecture behavioural of axi4_lite_master is
             if buffer_ready_r = '1' then
                 internal_awvalid <= '1';
                 internal_wvalid <= '1';
+                internal_awaddr <= std_logic_vector(unsigned(dst_base_addr) + (counter * 4));
                 s_axilt_wdata <= data_buffer;
                 if counter /= how_many_writes then
                     state_w <= WRITE;
