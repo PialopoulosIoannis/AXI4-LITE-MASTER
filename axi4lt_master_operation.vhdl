@@ -97,10 +97,8 @@ architecture behavioural of axi4_lite_master is
                     else state_r <= FINAL_READING;
                     end if;
            when READ =>
-                        if internal_araddr /= b"111111111111" then
                         internal_arvalid <= '1';
                         internal_rready <= '1';
-                    end if;
                     if internal_arvalid = '1' and s_axilt_arready = '1' then
                         internal_arvalid <= '0';
                     end if;
@@ -129,10 +127,8 @@ architecture behavioural of axi4_lite_master is
                     end if;
                     end if;
             when FINAL_READING => 
-                    if internal_araddr /= b"111111111111" then
                     internal_arvalid <= '1';
                     internal_rready <= '1';
-                    end if;
                     if internal_arvalid = '1' and s_axilt_arready = '1' then
                         internal_arvalid <= '0';
                     end if; 
