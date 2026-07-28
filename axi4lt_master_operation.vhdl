@@ -245,7 +245,7 @@ architecture behavioural of axi4_lite_master is
             else state_w <= WAITING_W; 
             end if;
             when FINAL_WRITING =>
-            case (final_write) is
+            case final_write is
                 when 0 =>
                 s_axilt_wstrb <= "0000";
                 when 1 => 
@@ -254,6 +254,8 @@ architecture behavioural of axi4_lite_master is
                 s_axilt_wstrb <= "0011";
                 when 3 =>
                 s_axilt_wstrb <= "0111";
+                when others =>
+                null;
                 end case;
 
                         if internal_awvalid = '1' and s_axilt_awready = '1' then
